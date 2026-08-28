@@ -6,7 +6,8 @@ from collector.delivery import DeliveryError,build_ingest_body,validate_ingest_o
 class DeliveryTests(unittest.TestCase):
     def test_origin_allowlist(self):
         self.assertEqual(validate_ingest_origin("https://wave-alpha-liquidation-coordinator.owner-subdomain.workers.dev"),"https://wave-alpha-liquidation-coordinator.owner-subdomain.workers.dev")
-        for value in ("http://wave-alpha-liquidation-coordinator.x.workers.dev","https://evil.example.com","https://wave-alpha-liquidation-coordinator.x.workers.dev/other","https://wave-alpha-liquidation-coordinator.x.workers.dev?token=1"):
+        self.assertEqual(validate_ingest_origin("https://wave-alpha-liquidation-coordinator.owner-subdomain.workers.dev:443"),"https://wave-alpha-liquidation-coordinator.owner-subdomain.workers.dev")
+        for value in ("http://wave-alpha-liquidation-coordinator.x.workers.dev","https://evil.example.com","https://wave-alpha-liquidation-coordinator.x.workers.dev/other","https://wave-alpha-liquidation-coordinator.x.workers.dev?token=1","https://wave-alpha-liquidation-coordinator.x.workers.dev:8443"):
             with self.assertRaises(DeliveryError): validate_ingest_origin(value)
     def test_body_binds_github_identity(self):
         env={"GITHUB_RUN_ID":"123","GITHUB_RUN_ATTEMPT":"2","GITHUB_SHA":"a"*40,"GITHUB_REF":"refs/heads/main"}

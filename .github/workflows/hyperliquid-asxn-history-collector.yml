@@ -33,6 +33,9 @@ jobs:
     timeout-minutes: 12
     env:
       HL_HISTORY_INGEST_ORIGIN: ${{ vars.HL_HISTORY_INGEST_ORIGIN }}
+      HL_MODE: ${{ inputs.mode }}
+      HL_SEED_FROM: ${{ inputs.seed_from }}
+      HL_SEED_TO: ${{ inputs.seed_to }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -48,8 +51,8 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          args=(--mode "${{ inputs.mode }}")
-          if [[ "${{ inputs.mode }}" == "seed" ]]; then
-            args+=(--seed-from "${{ inputs.seed_from }}" --seed-to "${{ inputs.seed_to }}")
+          args=(--mode "$HL_MODE")
+          if [[ "$HL_MODE" == "seed" ]]; then
+            args+=(--seed-from "$HL_SEED_FROM" --seed-to "$HL_SEED_TO")
           fi
           python -m collector.history_collector "${args[@]}"

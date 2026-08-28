@@ -22,10 +22,15 @@ def validate_ingest_origin(value: str) -> str:
         raise DeliveryError("INGEST_ORIGIN_INVALID")
     if parsed.path not in ("", "/") or parsed.params or parsed.query or parsed.fragment:
         raise DeliveryError("INGEST_ORIGIN_INVALID")
+    try:
+        port = parsed.port
+    except ValueError as error:
+        raise DeliveryError("INGEST_ORIGIN_INVALID") from error
+    if port not in (None, 443):
+        raise DeliveryError("INGEST_ORIGIN_PORT_INVALID")
     if not _WORKER_HOST.fullmatch(parsed.hostname.lower()):
         raise DeliveryError("INGEST_ORIGIN_NOT_ALLOWLISTED")
-    port = f":{parsed.port}" if parsed.port else ""
-    return f"https://{parsed.hostname.lower()}{port}"
+    return f"https://{parsed.hostname.lower()}"
 
 def _github_identity() -> tuple[str,str,str]:
     run_id = str(os.getenv("GITHUB_RUN_ID","")).strip()
