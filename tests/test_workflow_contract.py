@@ -10,5 +10,11 @@ class WorkflowContractTests(unittest.TestCase):
         text=Path(".github/workflows/hyperliquid-asxn-history-collector.yml").read_text()
         self.assertIn("HL_SEED_FROM: ${{ inputs.seed_from }}",text); self.assertIn("HL_SEED_TO: ${{ inputs.seed_to }}",text)
         self.assertNotIn('--seed-from "${{ inputs.seed_from }}"',text); self.assertNotIn('--seed-to "${{ inputs.seed_to }}"',text)
+    def test_oidc_qualification_cannot_enter_collector_job(self):
+        text=Path(".github/workflows/hyperliquid-asxn-history-collector.yml").read_text()
+        self.assertIn("inputs.mode != 'oidc-qualification'",text)
+        self.assertIn("inputs.mode == 'oidc-qualification'",text)
+        self.assertIn("HL_OIDC_QUALIFICATION_ORIGIN",text)
+        self.assertIn("collector/oidc_qualification.py",text)
 
 if __name__ == "__main__": unittest.main()

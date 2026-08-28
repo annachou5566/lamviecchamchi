@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "rolling or separately approved seed"
+        description: "rolling, separately approved seed, or OIDC qualification only"
         required: true
         default: rolling
         type: choice
-        options: [rolling, seed]
+        options: [rolling, seed, oidc-qualification]
       seed_from:
         description: "YYYY-MM-DD; seed only; coordinator enforces exact approved range"
         required: false
@@ -28,7 +28,7 @@ concurrency:
 
 jobs:
   collect:
-    if: github.ref == 'refs/heads/main' && vars.HL_HISTORY_EXECUTION_ENABLED == 'true'
+    if: github.ref == 'refs/heads/main' && inputs.mode != 'oidc-qualification' && vars.HL_HISTORY_EXECUTION_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 12
     env:
@@ -56,3 +56,21 @@ jobs:
             args+=(--seed-from "$HL_SEED_FROM" --seed-to "$HL_SEED_TO")
           fi
           python -m collector.history_collector "${args[@]}"
+
+  oidc-qualification:
+    if: github.ref == 'refs/heads/main' && inputs.mode == 'oidc-qualification'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      HL_OIDC_QUALIFICATION_ORIGIN: ${{ vars.HL_OIDC_QUALIFICATION_ORIGIN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Static compile qualification client
+        run: python -m py_compile collector/oidc_qualification.py
+      - name: Synthetic qualification tests
+        run: python -m unittest discover -s tests -p 'test_oidc_qualification.py' -v
+      - name: Request and verify exact GitHub OIDC identity
+        run: python collector/oidc_qualification.py
