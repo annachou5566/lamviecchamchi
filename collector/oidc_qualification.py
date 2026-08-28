@@ -10,6 +10,7 @@ from urllib.request import Request, urlopen
 OIDC_AUDIENCE = "urn:wave-alpha:liquidation:hyperliquid-history-ingest:v1"
 QUALIFICATION_PATH = "/qualify"
 QUALIFICATION_HEADER = "hyperliquid-oidc-v1"
+QUALIFICATION_TRIALS = 5
 MAX_RESPONSE_BYTES = 16 * 1024
 _QUALIFICATION_HOST = re.compile(r"^wave-alpha-hyperliquid-oidc-qualification\.[a-z0-9-]+\.workers\.dev$")
 
@@ -134,14 +135,21 @@ def main() -> int:
     origin = str(os.getenv("HL_OIDC_QUALIFICATION_ORIGIN", "")).strip()
     if not origin:
         raise SystemExit("HL_OIDC_QUALIFICATION_ORIGIN_MISSING")
+    results = []
     try:
-        result = qualify(origin)
+        for _ in range(QUALIFICATION_TRIALS):
+            results.append(qualify(origin))
     except OidcQualificationError as error:
         raise SystemExit(f"HL_OIDC_QUALIFICATION_FAIL code={error}") from error
+    walls = [result["wallMs"] for result in results]
+    max_wall = max(walls)
+    all_wall_le_5 = all(result["wallLe5Ms"] for result in results)
+    first = results[0]
     print(
         "HL_OIDC_QUALIFICATION_OK "
-        f"wall_ms={result['wallMs']:.3f} wall_le_5ms={str(result['wallLe5Ms']).lower()} "
-        f"run_id={result['runId']} run_attempt={result['runAttempt']} workflow_sha={result['workflowSha']}"
+        f"trials={QUALIFICATION_TRIALS} max_wall_ms={max_wall:.3f} "
+        f"wall_all_le_5ms={str(all_wall_le_5).lower()} "
+        f"run_id={first['runId']} run_attempt={first['runAttempt']} workflow_sha={first['workflowSha']}"
     )
     return 0
 
