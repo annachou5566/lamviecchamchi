@@ -74,3 +74,23 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_oidc_qualification.py' -v
       - name: Request and verify exact GitHub OIDC identity
         run: python collector/oidc_qualification.py
+
+  forensic-26-27:
+    if: github.ref == 'refs/heads/chatgpt/hyperliquid-26-27-forensic-2026-08-31' && inputs.mode == 'oidc-qualification'
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install bounded browser dependency
+        run: python -m pip install --disable-pip-version-check -r requirements.txt
+      - name: Static compile forensic source
+        run: python -m compileall -q collector tests
+      - name: Synthetic forensic contracts
+        run: python -m unittest discover -s tests -p 'test_*.py' -v
+      - name: Read-only ephemeral ASXN 26-27 forensic
+        run: python -m collector.history_forensic
