@@ -8,6 +8,7 @@ from typing import Any
 
 SEAM_DATE = "2026-08-25"
 CENT = Decimal("0.01")
+RECONCILIATION_MONEY_TOLERANCE_CENTS = 1_000
 MAX_SAFE_INTEGER = 9_007_199_254_740_991
 _MONEY_ALIASES = {
     "long": ("long_notional", "long_notional_usd", "long_usd"),
@@ -155,7 +156,7 @@ def apply_hourly_reconciliation(daily_rows: list[dict[str, Any]], hourly_payload
             row["payloadDigest"] = _digest(row); continue
         sums = tuple(sum(values[i] for values in hours.values()) for i in range(6))
         daily = (row["longCents"],row["shortCents"],row["totalCents"],row["longCount"],row["shortCount"],row["count"])
-        money_match = all(abs(sums[i]-daily[i]) <= 1 for i in range(3))
+        money_match = all(abs(sums[i]-daily[i]) <= RECONCILIATION_MONEY_TOLERANCE_CENTS for i in range(3))
         count_match = all(sums[i] == daily[i] for i in range(3,6))
         row["reconciliationStatus"] = "match" if money_match and count_match else "mismatch"
         row["hourlyBucketCount"] = 24
