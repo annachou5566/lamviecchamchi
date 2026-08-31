@@ -12,6 +12,7 @@ OIDC_AUDIENCE = "urn:wave-alpha:liquidation:hyperliquid-history-ingest:v1"
 INGEST_PATH = "/ingest/hyperliquid-history"
 MAX_RESPONSE_BYTES = 16 * 1024
 _WORKER_HOST = re.compile(r"^wave-alpha-liquidation-coordinator\.[a-z0-9-]+\.workers\.dev$")
+_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 class DeliveryError(RuntimeError):
     pass
@@ -66,6 +67,43 @@ def _oidc_token() -> str:
     if not token: raise DeliveryError("OIDC_TOKEN_MISSING")
     return token
 
+def normalize_delivery_ack(result: dict[str,Any]) -> dict[str,Any]:
+    raw_rows = result.get("rows")
+    rows: list[dict[str,Any]] = []
+    dated = isinstance(raw_rows,list)
+    if isinstance(raw_rows,list):
+        for item in raw_rows:
+            if not isinstance(item,dict):
+                dated = False
+                continue
+            date = str(item.get("date") or "").strip()
+            if not _DATE.fullmatch(date):
+                dated = False
+                continue
+            rows.append({
+                "date": date,
+                "applied": bool(item.get("applied")),
+                "canonicalChanged": bool(item.get("canonicalChanged")),
+                "reason": str(item.get("reason") or "unknown"),
+            })
+    else:
+        dated = False
+
+    rejected = [row["date"] for row in rows if row["reason"] == "closed-day-reconciliation-mismatch"]
+    server_rejected = result.get("reconciliationRejectedDates")
+    if not rejected and isinstance(server_rejected,list):
+        candidate = [str(value or "").strip() for value in server_rejected]
+        if all(_DATE.fullmatch(value) for value in candidate):
+            rejected = candidate
+
+    return {
+        "ok": True,
+        "applied": bool(result.get("applied")),
+        "ackDated": bool(dated and isinstance(raw_rows,list) and len(rows) == len(raw_rows)),
+        "rows": rows,
+        "reconciliationRejectedDates": rejected,
+    }
+
 def deliver(body: dict[str,Any], *, ingest_origin: str) -> dict[str,Any]:
     origin = validate_ingest_origin(ingest_origin)
     payload = json.dumps(body,separators=(",",":"),sort_keys=True).encode()
@@ -82,4 +120,4 @@ def deliver(body: dict[str,Any], *, ingest_origin: str) -> dict[str,Any]:
     try: result = json.loads(raw or b"{}")
     except json.JSONDecodeError as error: raise DeliveryError("INGEST_RESPONSE_INVALID") from error
     if not isinstance(result,dict) or result.get("ok") is not True: raise DeliveryError("INGEST_REJECTED")
-    return {"ok":True,"applied":bool(result.get("applied"))}
+    return normalize_delivery_ack(result)
