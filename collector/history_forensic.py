@@ -6,7 +6,13 @@ from datetime import datetime, timezone
 from typing import Any
 
 from collector.asxn_browser import AsxnBrowserError, AsxnBrowserSession
-from collector.asxn_schema import AsxnSchemaError, _hour_row, normalize_daily_rows, rows_from_payload
+from collector.asxn_schema import (
+    RECONCILIATION_MONEY_TOLERANCE_CENTS,
+    AsxnSchemaError,
+    _hour_row,
+    normalize_daily_rows,
+    rows_from_payload,
+)
 
 TARGET_FROM = "2026-08-26"
 TARGET_TO = "2026-08-27"
@@ -82,7 +88,10 @@ def reconciliation_diagnostics(
 
         hourly = tuple(sum(values[index] for values in hours.values()) for index in range(6))
         delta = tuple(daily[index] - hourly[index] for index in range(6))
-        money_match = all(abs(delta[index]) <= 1 for index in range(3))
+        money_match = all(
+            abs(delta[index]) <= RECONCILIATION_MONEY_TOLERANCE_CENTS
+            for index in range(3)
+        )
         count_match = all(delta[index] == 0 for index in range(3, 6))
         diagnostics.append({
             "date": date,
@@ -123,9 +132,10 @@ def run() -> None:
         current_date=current_date,
     )
 
-    print("WAVE_ALPHA_HL_26_27_FORENSIC_V1")
+    print("WAVE_ALPHA_HL_26_27_FORENSIC_V2")
     print("mode=READ_ONLY_EPHEMERAL_NO_DELIVERY")
     print(f"target={TARGET_FROM}..{TARGET_TO}")
+    print(f"moneyToleranceCents={RECONCILIATION_MONEY_TOLERANCE_CENTS}")
     for item in diagnostics:
         daily = item["daily"]
         hourly = item["hourly"]
