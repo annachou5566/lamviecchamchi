@@ -31,6 +31,12 @@ def _bounds(mode: str, seed_from: str|None, seed_to: str|None) -> tuple[str,str,
     if fetch_days>MAX_SEED_DAYS: raise ValueError("SEED_FETCH_WINDOW_TOO_WIDE")
     return start.isoformat(),end.isoformat(),fetch_days
 
+def _ack_summary(result: dict) -> str:
+    if not result.get("ackDated"):
+        return "ACK_UNDATED"
+    rows=result.get("rows") or []
+    return ";".join(f"{row['date']}:{row['reason']}:{'applied' if row['applied'] else 'not-applied'}" for row in rows)
+
 def run(mode: str, seed_from: str|None, seed_to: str|None) -> None:
     from_date,to_date,fetch_days = _bounds(mode,seed_from,seed_to)
     observed_at_ms = int(time.time()*1000)
@@ -49,7 +55,8 @@ def run(mode: str, seed_from: str|None, seed_to: str|None) -> None:
     ingest_origin = str(os.getenv("HL_HISTORY_INGEST_ORIGIN","")).strip()
     if not ingest_origin: raise DeliveryError("INGEST_ORIGIN_MISSING")
     result=deliver(body,ingest_origin=ingest_origin)
-    print(f"HL_HISTORY_DELIVERY_OK applied={str(result['applied']).lower()} rows={len(rows)}")
+    rejected=','.join(result.get("reconciliationRejectedDates") or []) or 'none'
+    print(f"HL_HISTORY_DELIVERY_OK applied={str(result['applied']).lower()} rows={len(rows)} ack={_ack_summary(result)} reconciliation_rejected={rejected}")
 
 def main() -> int:
     parser=argparse.ArgumentParser(); parser.add_argument("--mode",choices=("rolling","seed"),default="rolling"); parser.add_argument("--seed-from"); parser.add_argument("--seed-to"); args=parser.parse_args()
